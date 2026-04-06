@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  VET
+  RECEPTIONIST
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+// ─── Clinic (Tenant) ──────────────────────────────────────────────────────────
+
+model Clinic {
+  id        String   @id @default(uuid())
+  name      String
+  cnpj      String?  @unique
+  phone     String?
+  email     String?
+  address   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users          User[]
+  owners         Owner[]
+  pets           Pet[]
+  appointments   Appointment[]
+  medicalRecords MedicalRecord[]
+  transactions   Transaction[]
+
+  @@map("clinics")
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  clinicId  String
+  name      String
+  email     String
+  password  String
+  role      UserRole @default(RECEPTIONIST)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clinic         Clinic          @relation(fields: [clinicId], references: [id])
+  appointments   Appointment[]
+  medicalRecords MedicalRecord[]
+
+  @@unique([email, clinicId])
+  @@map("users")
+}
+
+// ─── Owner ────────────────────────────────────────────────────────────────────
+
+model Owner {
+  id        String   @id @default(uuid())
+  clinicId  String
+  name      String
+  email     String?
+  phone     String
+  cpf       String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+  pets   Pet[]
+
+  @@unique([cpf, clinicId])
+  @@map("owners")
+}
+
+// ─── Pet ──────────────────────────────────────────────────────────────────────
+
+model Pet {
+  id        String   @id @default(uuid())
+  clinicId  String
+  ownerId   String
+  name      String
+  species   String
+  breed     String?
+  birthDate DateTime?
+  weight    Float?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clinic         Clinic          @relation(fields: [clinicId], references: [id])
+  owner          Owner           @relation(fields: [ownerId], references: [id])
+  appointments   Appointment[]
+  medicalRecords MedicalRecord[]
+
+  @@map("pets")
+}
+
+// ─── Appointment ──────────────────────────────────────────────────────────────
+
+model Appointment {
+  id          String            @id @default(uuid())
+  clinicId    String
+  petId       String
+  vetId       String
+  scheduledAt DateTime
+  status      AppointmentStatus @default(SCHEDULED)
+  reason      String?
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+  pet    Pet    @relation(fields: [petId], references: [id])
+  vet    User   @relation(fields: [vetId], references: [id])
+
+  @@map("appointments")
+}
+
+// ─── Medical Record ───────────────────────────────────────────────────────────
+
+model MedicalRecord {
+  id          String   @id @default(uuid())
+  clinicId    String
+  petId       String
+  vetId       String
+  attendedAt  DateTime @default(now())
+  anamnesis   String?
+  diagnosis   String
+  treatment   String
+  prescription String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+  pet    Pet    @relation(fields: [petId], references: [id])
+  vet    User   @relation(fields: [vetId], references: [id])
+
+  @@map("medical_records")
+}
+
+// ─── Financial Transaction ────────────────────────────────────────────────────
+
+model Transaction {
+  id          String          @id @default(uuid())
+  clinicId    String
+  type        TransactionType
+  amount      Float
+  description String
+  category    String?
+  date        DateTime        @default(now())
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@map("transactions")
+}
