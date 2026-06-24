@@ -1,0 +1,33 @@
+{
+  "comment": "Cron jobs (pg_cron) do VetFlow. {{LOG}} = tabela de log, {{PREFIX}} = prefixo.",
+  "jobs": [
+    {
+      "num": 1,
+      "name": "heartbeat",
+      "schedule": "0 */6 * * *",
+      "description": "heartbeat de saúde do projeto a cada 6h",
+      "sql": "insert into {{LOG}}(num, job_name, description) values (1, '{{PREFIX}}heartbeat', 'heartbeat 6h')"
+    },
+    {
+      "num": 2,
+      "name": "trial_sweep",
+      "schedule": "0 3 * * *",
+      "description": "marca trials expirados como past_due (acesso reduzido ao Inicial)",
+      "sql": "update public.app_subscriptions set status = 'past_due', updated_at = now() where status = 'trialing' and plan_slug = 'inicial' and current_period_end is not null and current_period_end < now(); update public.profiles set plan_slug = 'inicial' where trial_ends_at is not null and trial_ends_at < now() and plan_slug = 'inicial'; insert into {{LOG}}(num, job_name, description) values (2, '{{PREFIX}}trial_sweep', 'trials expirados reduzidos')"
+    },
+    {
+      "num": 3,
+      "name": "events_prune",
+      "schedule": "0 5 1 * *",
+      "description": "remove eventos de pagamento com mais de 180 dias",
+      "sql": "delete from public.app_payment_events where created_at < now() - interval '180 days'; insert into {{LOG}}(num, job_name, description) values (3, '{{PREFIX}}events_prune', 'eventos antigos removidos')"
+    },
+    {
+      "num": 4,
+      "name": "appointments_reminder_rollup",
+      "schedule": "0 7 * * *",
+      "description": "registra quantas consultas estão agendadas para as próximas 24h (base de lembretes)",
+      "sql": "insert into {{LOG}}(num, job_name, description) select 4, '{{PREFIX}}appointments_reminder_rollup', 'consultas próximas 24h: ' || count(*) from public.appointments where scheduled_at between now() and now() + interval '24 hours' and status in ('agendada','confirmada')"
+    }
+  ]
+}
